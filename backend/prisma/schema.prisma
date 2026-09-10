@@ -6,7 +6,7 @@ generator client {
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  // directUrl = env("DIRECT_URL")
 }
 
 model Kantor {
@@ -22,24 +22,26 @@ model Kantor {
 }
 
 model Pengguna {
-  id               Int                @id @default(autoincrement())
-  nama             String
-  email            String             @unique
-  kataSandi        String             @map("kata_sandi")
-  peran            Peran              @default(karyawan)
-  jabatan          String?
-  divisi           String?
-  kantorId         Int?               @map("kantor_id")
-  statusAkun       StatusAkun         @default(menunggu_konfirmasi) @map("status_akun")
-  dibuatPada       DateTime           @default(now()) @map("dibuat_pada")
-  absensiDiedit    Absensi[]          @relation("AbsensiDiedit")
-  absensi          Absensi[]          @relation("AbsensiPengguna")
-  gaji             GajiKaryawan?
-  laporanGaji      LaporanGaji[]
-  izinDiproses     PengajuanIzin[]    @relation("IzinDiproses")
-  pengajuanIzin    PengajuanIzin[]    @relation("IzinPengaju")
+  id Int @id @default(autoincrement())
+  nama String
+  email String @unique
+  kataSandi String @map("kata_sandi")
+  peran Peran @default(karyawan)
+  jabatan String?
+  divisi String?
+  kantorId Int? @map("kantor_id")
+  statusAkun StatusAkun @default(menunggu_konfirmasi) @map("status_akun")
+  dibuatPada DateTime @default(now()) @map("dibuat_pada")
+  absensiDiedit Absensi[] @relation("AbsensiDiedit")
+  absensi Absensi[] @relation("AbsensiPengguna")
+  gaji GajiKaryawan?
+  laporanGaji LaporanGaji[]
+  izinDiproses PengajuanIzin[] @relation("IzinDiproses")
+  pengajuanIzin PengajuanIzin[] @relation("IzinPengaju")
   pushSubscriptions PushSubscription[]
-  kantor           Kantor?            @relation(fields: [kantorId], references: [id])
+  kantor Kantor? @relation(fields: [kantorId], references: [id])
+  face UserFace?
+  manualAbsens ManualAbsenRequest[]
 
   @@index([kantorId])
   @@map("pengguna")
@@ -82,6 +84,8 @@ model Absensi {
   dibuatPada      DateTime         @default(now()) @map("dibuat_pada")
   editor          Pengguna?        @relation("AbsensiDiedit", fields: [dieditOleh], references: [id])
   pengguna        Pengguna         @relation("AbsensiPengguna", fields: [penggunaId], references: [id])
+  keterangan      String? @map("keterangan")
+  menitTerlambat  Int?    @map("menit_terlambat")
 
   @@unique([penggunaId, tanggal])
   @@index([dieditOleh])
@@ -222,4 +226,32 @@ enum StatusArsip {
   selesai
   gagal
   dibatalkan
+}
+
+// MODEL BARU 1: Simpan embedding wajah
+// MODEL BARU 1: Simpan embedding wajah
+model UserFace {
+  id Int @id @default(autoincrement())
+  penggunaId Int @unique @map("pengguna_id")
+  user Pengguna @relation(fields: [penggunaId], references: [id], onDelete: Cascade)
+  descriptors Json
+  quality String @default("KIOSK")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("user_face")
+}
+
+model ManualAbsenRequest {
+  id Int @id @default(autoincrement())
+  penggunaId Int @map("pengguna_id")
+  user Pengguna @relation(fields: [penggunaId], references: [id], onDelete: Cascade)
+  tipe String
+  requestedAt DateTime @map("requested_at")
+  fotoBukti String? @map("foto_bukti")
+  alasan String?
+  status String @default("PENDING")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("manual_absen_request")
 }

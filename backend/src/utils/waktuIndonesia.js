@@ -1,109 +1,56 @@
-const TIMEZONE = "Asia/Jakarta";
 
-function bagianWaktuWIB(date = new Date()) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: TIMEZONE,
-    year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", second: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(date);
+// utils/waktuIndonesia.js - UPDATED jam 08:10 & 17:00
+const JAM_MASUK_STANDAR_DEFAULT = process.env.JAM_MASUK_STANDAR || "08:10";
+const JAM_PULANG_STANDAR_DEFAULT = process.env.JAM_PULANG_STANDAR || "17:00";
 
-  const result = {};
-  for (const part of parts) {
-    if (part.type !== "literal") result[part.type] = part.value;
-  }
-
-  return {
-    tahun: Number(result.year),
-    bulan: Number(result.month),
-    hari: Number(result.day),
-    jam: Number(result.hour),
-    menit: Number(result.minute),
-    detik: Number(result.second),
-  };
+function tahunBulanSekarangWIB() {
+  const now = new Date();
+  const wibStr = now.toLocaleString("en-US", { timeZone: "Asia/Jakarta" });
+  const wib = new Date(wibStr);
+  return { tahun: wib.getFullYear(), bulan: wib.getMonth() + 1, tanggal: wib.getDate(), jam: wib.getHours(), menit: wib.getMinutes() };
 }
 
-function tanggalHariIniWIB(date = new Date()) {
-  const wib = bagianWaktuWIB(date);
-  return new Date(Date.UTC(wib.tahun, wib.bulan - 1, wib.hari));
+function parseJam(jamStr) {
+  const [h,m] = (jamStr || "08:10").split(":").map(Number);
+  return h*60+m;
 }
 
-function jamSekarangWIB(date = new Date()) {
-  const wib = bagianWaktuWIB(date);
-  return wib.jam + wib.menit / 60 + wib.detik / 3600;
+function jamMasukWIBToMenit(date) {
+  if(!date) return null;
+  const wibStr = new Date(date).toLocaleString("en-US", { timeZone: "Asia/Jakarta" });
+  const wib = new Date(wibStr);
+  return wib.getHours()*60 + wib.getMinutes();
 }
 
-function tahunBulanSekarangWIB(date = new Date()) {
-  const wib = bagianWaktuWIB(date);
-  return { tahun: wib.tahun, bulan: wib.bulan };
-}
-
-function sekarangWIB(date = new Date()) {
-  return bagianWaktuWIB(date);
-}
-
-const JAM_MASUK_STANDAR_DEFAULT = "08:10:00";
-
-function jamKeMenit(jam) {
-  const bagian = String(jam || "").split(":").map(Number);
-  if (bagian.length < 2 || bagian.some((n) => Number.isNaN(n))) return null;
-
-  const [hour, minute] = bagian;
-  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
-
-  return hour * 60 + minute;
-}
-
-function menitWIB(date = new Date()) {
-  return Math.floor(jamSekarangWIB(date) * 60);
-}
-
-function statusOtomatisDariWaktu(
-  waktu,
-  jamMasukStandar = JAM_MASUK_STANDAR_DEFAULT,
-) {
-  if (!waktu) return null;
-
-  const date = waktu instanceof Date ? waktu : new Date(waktu);
-  if (Number.isNaN(date.getTime())) return null;
-
-  const batas =
-    jamKeMenit(jamMasukStandar) ?? jamKeMenit(JAM_MASUK_STANDAR_DEFAULT);
-
-  return menitWIB(date) <= batas ? "tepat_waktu" : "telat";
-}
-
-function statusEfektif(
-  absensi,
-  jamMasukStandar = JAM_MASUK_STANDAR_DEFAULT,
-) {
-  if (!absensi) return "alpha";
-
-  // Status yang sudah tersimpan menjadi sumber kebenaran untuk riwayat.
-  // Perubahan pengaturan jam standar berlaku untuk absensi baru, bukan
-  // mengubah status absensi yang sudah terjadi.
-  if (absensi.dieditOleh != null) {
-    return absensi.statusFinal || absensi.statusOtomatis || "alpha";
-  }
-
-  if (absensi.statusOtomatis || absensi.statusFinal) {
-    return absensi.statusFinal || absensi.statusOtomatis || "alpha";
-  }
-
-  // Fallback hanya untuk record lama yang belum memiliki status tersimpan.
-  return statusOtomatisDariWaktu(absensi.jamMasuk, jamMasukStandar) || "alpha";
+function statusEfektif(absen, jamMasukStandar) {
+  // absen bisa punya status manual: izin, sakit, cuti, urgent
+  if (!absen) return "alpha";
+  if (absen.status === "izin" || absen.statusOtomatis === "izin") return "izin";
+  if (absen.status === "sakit" || absen.statusOtomatis === "sakit") return "sakit";
+  if (absen.status === "cuti" || absen.statusOtomatis === "cuti") return "cuti";
+  if (absen.status === "urgent" || absen.statusOtomatis === "urgent") return "urgent";
+  
+  // Jika tidak ada jam masuk -> alpha
+  if (!absen.jamMasuk) return "alpha";
+  
+  // Bandingkan jam masuk WIB dengan standar 08:10
+  const standar = jamMasukStandar || JAM_MASUK_STANDAR_DEFAULT;
+  const batasMenit = parseJam(standar);
+  const masukMenit = jamMasukWIBToMenit(absen.jamMasuk);
+  
+  if (masukMenit === null) return "alpha";
+  
+  // Lewat 08:10 = telat (sesuai hitungGajiController lama)
+  if (masukMenit > batasMenit) return "telat";
+  
+  return "tepat_waktu";
 }
 
 module.exports = {
-  TIMEZONE,
-  bagianWaktuWIB,
-  tanggalHariIniWIB,
-  jamSekarangWIB,
   tahunBulanSekarangWIB,
-  sekarangWIB,
-  JAM_MASUK_STANDAR_DEFAULT,
-  jamKeMenit,
-  menitWIB,
-  statusOtomatisDariWaktu,
   statusEfektif,
+  JAM_MASUK_STANDAR_DEFAULT,
+  JAM_PULANG_STANDAR_DEFAULT,
+  parseJam,
+  jamMasukWIBToMenit,
 };

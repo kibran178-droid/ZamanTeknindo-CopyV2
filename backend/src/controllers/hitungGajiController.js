@@ -147,9 +147,6 @@ async function siapkanKonteksGaji(tahun, bulan) {
   const bulanIniBerjalan = tahun === sekarangWIB.tahun && bulan === sekarangWIB.bulan;
 
   // Hari yang sedang berjalan belum boleh dianggap alpha.
-  // Perhitungan bulan aktif hanya menghitung hari kerja yang SUDAH SELESAI
-  // sebelum tanggal WIB hari ini. Dengan begitu, menghitung gaji pukul pagi
-  // tidak langsung memberi potongan alpha kepada semua karyawan.
   const tanggalHariIniWIB = tanggalUTC(sekarangWIB.tahun, sekarangWIB.bulan, sekarangWIB.tanggal);
   const hariKerjaDihitung = bulanIniBerjalan
     ? hariKerjaSetelahLibur.filter((d) => d < tanggalHariIniWIB)
@@ -163,15 +160,10 @@ async function siapkanKonteksGaji(tahun, bulan) {
 
 async function hitungGajiKaryawan(penggunaId, tahun, bulan) {
   const { pengaturan, hariKerjaDihitung, awalBulan, akhirBulan } = await siapkanKonteksGaji(tahun, bulan);
-
-  // Production memakai transaction pooler dengan connection_limit kecil.
-  // Baca berurutan supaya satu perhitungan gaji tidak berebut koneksi dengan
-  // query absensi/gaji lain dan memicu P2024.
   const gajiData = await prisma.gajiKaryawan.findUnique({ where: { penggunaId } });
   const semuaAbsensi = await prisma.absensi.findMany({
     where: { penggunaId, tanggal: { gte: awalBulan, lte: akhirBulan } },
   });
-
   return hitungDariData({ penggunaId, tahun, bulan, gajiData, pengaturan, hariKerjaDihitung, petaAbsensi: buatPetaAbsensi(semuaAbsensi) });
 }
 
@@ -198,9 +190,6 @@ async function hitungDanSimpanSemua(req, res) {
   try {
     const { tahun, bulan } = validasiTahunBulan(req);
     const { pengaturan, hariKerjaDihitung, awalBulan, akhirBulan } = await siapkanKonteksGaji(tahun, bulan);
-
-    // Jalankan query berurutan karena pool production sengaja kecil.
-    // Urutannya tidak mengubah hasil perhitungan, hanya mengurangi perebutan koneksi.
     const karyawanAktif = await prisma.pengguna.findMany({
       where: { peran: "karyawan", statusAkun: "aktif" },
       select: { id: true, nama: true },
@@ -212,14 +201,12 @@ async function hitungDanSimpanSemua(req, res) {
         pengguna: { peran: "karyawan", statusAkun: "aktif" },
       },
     });
-
     const petaGaji = new Map(semuaGaji.map((item) => [item.penggunaId, item]));
     const petaAbsensiPerKaryawan = new Map();
     for (const absensi of semuaAbsensi) {
       if (!petaAbsensiPerKaryawan.has(absensi.penggunaId)) petaAbsensiPerKaryawan.set(absensi.penggunaId, []);
       petaAbsensiPerKaryawan.get(absensi.penggunaId).push(absensi);
     }
-
     const hasilSemua = [];
     const gagal = [];
     for (const k of karyawanAktif) {
@@ -237,7 +224,6 @@ async function hitungDanSimpanSemua(req, res) {
         gagal.push({ nama: k.nama, alasan: pesanAmanGagalGaji(err) });
       }
     }
-
     if (hasilSemua.length > 0) {
       const laporan = await prisma.$transaction(hasilSemua.map((hasil) => prisma.laporanGaji.upsert({
         where: { penggunaId_tahun_bulan: { penggunaId: hasil.penggunaId, tahun, bulan } },
@@ -246,7 +232,6 @@ async function hitungDanSimpanSemua(req, res) {
       })));
       return res.json({ pesan: `Perhitungan gaji selesai untuk ${laporan.length} dari ${karyawanAktif.length} karyawan.`, data: laporan, gagal });
     }
-
     return res.json({ pesan: `Perhitungan gaji selesai untuk 0 dari ${karyawanAktif.length} karyawan.`, data: [], gagal });
   } catch (error) {
     console.error(error);

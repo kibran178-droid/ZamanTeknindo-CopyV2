@@ -13,6 +13,7 @@ const DashboardAdmin = lazy(() => import("./pages/DashboardAdmin"));
 const AdminArsip = lazy(() => import("./pages/AdminArsip"));
 const AdminEditKaryawan = lazy(() => import("./pages/AdminEditKaryawan"));
 const GantiPassword = lazy(() => import("./pages/GantiPassword"));
+const Kiosk = lazy(() => import("./pages/Kiosk"));
 
 const STATUS_ADMIN_TANPA_ABSENSI = [
   { value: "alpha", label: "Alpha" },
@@ -375,6 +376,7 @@ function RuteAplikasi({ pengguna, setPengguna, onLogout }) {
   return (
     <Suspense fallback={<MemuatHalaman penuh />}>
       <Routes>
+        <Route path="/kiosk" element={<Kiosk />} />
         <Route path="/login" element={pengguna ? <Navigate to={pengguna.peran === "admin" ? "/admin" : "/karyawan"} replace /> : <Login onLoginBerhasil={(data) => { setPengguna(data); navigate(data.peran === "admin" ? "/admin" : "/karyawan", { replace: true }); }} kePendaftaran={() => navigate("/daftar")} />} />
         <Route path="/daftar" element={pengguna ? <Navigate to={pengguna.peran === "admin" ? "/admin" : "/karyawan"} replace /> : <Daftar keLogin={() => navigate("/login")} />} />
         <Route path="/karyawan" element={<RuteTerproteksi pengguna={pengguna} peranDiizinkan={["karyawan"]}><DashboardKaryawan pengguna={pengguna} onLogout={onLogout} /></RuteTerproteksi>} />
