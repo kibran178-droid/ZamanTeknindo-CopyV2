@@ -68,7 +68,7 @@ model Absensi {
   tanggal         DateTime         @db.Date
   jamMasuk        DateTime?        @map("jam_masuk")
   jamPulang       DateTime?        @map("jam_pulang")
-  fotoMasuk       String?          @map("foto_masuk")
+  fotoMasuk String? @map("foto_masuk") @db.Text
   fotoPulang      String?          @map("foto_pulang")
   latitudeMasuk   Float?           @map("latitude_masuk")
   longitudeMasuk  Float?           @map("longitude_masuk")
@@ -228,7 +228,6 @@ enum StatusArsip {
   dibatalkan
 }
 
-// MODEL BARU 1: Simpan embedding wajah
 // MODEL BARU 1: Simpan embedding wajah
 model UserFace {
   id Int @id @default(autoincrement())

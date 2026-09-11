@@ -93,7 +93,6 @@ const recognize = async (req, res) => {
   } catch (e) { console.error(e); res.status(500).json({ message: e.message }); }
 };
 
-// FINAL FIX: sinkron dengan hitungGajiController - status = telat (bukan terlambat) + simpan menitTerlambat
 const kioskAbsen = async (req, res) => {
   try {
     let { penggunaId, tipe, foto, latitude, longitude } = req.body;
@@ -114,16 +113,16 @@ const kioskAbsen = async (req, res) => {
         return res.status(400).json({ message: `Absen masuk ditutup. Maksimal jam ${JAM_MASUK_MAX} (toleransi sampai 10:10). Sekarang ${jamStr} WIB` });
       }
       let statusOtomatis = "tepat_waktu"; let keterangan = null; let menitTerlambat = 0;
-      if (totalMenit > batasMasuk) { 
-        statusOtomatis = "telat"; // FIX: pakai telat biar sinkron dengan hitungGajiController
-        menitTerlambat = totalMenit - batasMasuk; 
-        keterangan = `Terlambat ${menitTerlambat} menit (masuk ${jamStr}, batas ${JAM_MASUK_MAX})`; 
+      if (totalMenit > batasMasuk) {
+        statusOtomatis = "telat";
+        menitTerlambat = totalMenit - batasMasuk;
+        keterangan = `Terlambat ${menitTerlambat} menit (masuk ${jamStr}, batas ${JAM_MASUK_MAX})`;
       }
-      const data = absen ? await prisma.absensi.update({ 
-        where: { id: absen.id }, 
-        data: { jamMasuk: now, fotoMasuk: foto, latitudeMasuk: latitude, longitudeMasuk: longitude, statusOtomatis, keterangan, menitTerlambat } 
-      }) : await prisma.absensi.create({ 
-        data: { penggunaId: Number(penggunaId), tanggal: start, jamMasuk: now, fotoMasuk: foto, latitudeMasuk: latitude, longitudeMasuk: longitude, statusOtomatis, keterangan, menitTerlambat } 
+      const data = absen ? await prisma.absensi.update({
+        where: { id: absen.id },
+        data: { jamMasuk: now, fotoMasuk: foto, latitudeMasuk: latitude, longitudeMasuk: longitude, statusOtomatis, keterangan, menitTerlambat }
+      }) : await prisma.absensi.create({
+        data: { penggunaId: Number(penggunaId), tanggal: start, jamMasuk: now, fotoMasuk: foto, latitudeMasuk: latitude, longitudeMasuk: longitude, statusOtomatis, keterangan, menitTerlambat }
       });
       const pesan = statusOtomatis === "telat" ? `Absen masuk berhasil (TERLAMBAT ${menitTerlambat} menit)` : "Absen masuk berhasil";
       return res.json({ message: pesan, data, tipe, statusOtomatis, jamMasuk: jamStr, menitTerlambat });

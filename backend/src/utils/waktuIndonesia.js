@@ -1,5 +1,4 @@
-
-// utils/waktuIndonesia.js - UPDATED jam 08:10 & 17:00
+// utils/waktuIndonesia.js - UPDATED jam 08:10 & 17:00 + fix tanggalHariIniWIB
 const JAM_MASUK_STANDAR_DEFAULT = process.env.JAM_MASUK_STANDAR || "08:10";
 const JAM_PULANG_STANDAR_DEFAULT = process.env.JAM_PULANG_STANDAR || "17:00";
 
@@ -22,27 +21,36 @@ function jamMasukWIBToMenit(date) {
   return wib.getHours()*60 + wib.getMinutes();
 }
 
+// FIX: fungsi yang dicari rekapAbsensiFixedController.js
+function tanggalHariIniWIB() {
+  const wibDateStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
+  // return Date object jam 23:59:59 WIB hari ini - biar request hari ini tidak dianggap melebihi hari ini
+  return new Date(`${wibDateStr}T23:59:59.999+07:00`);
+}
+
+function tanggalHariIniWIBString() {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
+}
+
+function getWIBTodayRange() {
+  const wibDateStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
+  const start = new Date(`${wibDateStr}T00:00:00+07:00`);
+  const end = new Date(`${wibDateStr}T23:59:59.999+07:00`);
+  return { wibDateStr, start, end };
+}
+
 function statusEfektif(absen, jamMasukStandar) {
-  // absen bisa punya status manual: izin, sakit, cuti, urgent
   if (!absen) return "alpha";
   if (absen.status === "izin" || absen.statusOtomatis === "izin") return "izin";
   if (absen.status === "sakit" || absen.statusOtomatis === "sakit") return "sakit";
   if (absen.status === "cuti" || absen.statusOtomatis === "cuti") return "cuti";
   if (absen.status === "urgent" || absen.statusOtomatis === "urgent") return "urgent";
-  
-  // Jika tidak ada jam masuk -> alpha
   if (!absen.jamMasuk) return "alpha";
-  
-  // Bandingkan jam masuk WIB dengan standar 08:10
   const standar = jamMasukStandar || JAM_MASUK_STANDAR_DEFAULT;
   const batasMenit = parseJam(standar);
   const masukMenit = jamMasukWIBToMenit(absen.jamMasuk);
-  
   if (masukMenit === null) return "alpha";
-  
-  // Lewat 08:10 = telat (sesuai hitungGajiController lama)
   if (masukMenit > batasMenit) return "telat";
-  
   return "tepat_waktu";
 }
 
@@ -53,4 +61,7 @@ module.exports = {
   JAM_PULANG_STANDAR_DEFAULT,
   parseJam,
   jamMasukWIBToMenit,
+  tanggalHariIniWIB,
+  tanggalHariIniWIBString,
+  getWIBTodayRange,
 };

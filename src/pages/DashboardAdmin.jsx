@@ -790,15 +790,24 @@ export default function DashboardAdmin({ pengguna, onLogout, tanggalRekap, rekap
   // itu, supaya foto lama yang sempat tersimpan salah juga ikut normal
   // tampil lagi tanpa perlu karyawan absen ulang.
   function urlFoto(namaFile, urlSigned = null) {
-    if (urlSigned) return urlSigned;
     if (!namaFile) return null;
 
-    // Untuk data lama yang masih memakai path /uploads/
-    if (namaFile.startsWith("/uploads/")) {
+    if (namaFile.startsWith("http") || namaFile.startsWith("data:") || namaFile.startsWith("/uploads/")) {
       return namaFile;
     }
 
-    return null;
+    if (urlSigned && (urlSigned.includes("token=") || urlSigned.includes("sign="))) {
+      return urlSigned;
+    }
+
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const bucket = import.meta.env.VITE_SUPABASE_BUCKET || 'foto-absensi';
+    
+    if (supabaseUrl && !supabaseUrl.includes("xxxxxxxx.supabase.co")) {
+      return `${supabaseUrl}/storage/v1/object/public/${bucket}/${namaFile}`;
+    }
+
+    return urlSigned || null;
   }
 
   function formatJam(tanggalIso) {
